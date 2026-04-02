@@ -1,12 +1,12 @@
 # 🖥️ CYRITO.exe
 
 > You are not supposed to be here...
-> > run cyrito.exe
+> > runing cyrito.exe
 
-Initializing...
-Bypassing firewall...
+> Initializing...
+> Bypassing firewall...
 
-ACCESS GRANTED
+> ACCESS GRANTED
 
 CYRITO.exe is a browser-based hacker simulation game where you crack passwords, bypass systems, and avoid being traced.
 
