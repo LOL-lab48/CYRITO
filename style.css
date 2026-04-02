@@ -4,8 +4,8 @@ body {
   font-family: monospace;
   margin: 0;
   padding: 10px;
-  user-select: none;
   overflow: hidden;
+  user-select: none;
 }
 
 #terminal {
@@ -22,11 +22,11 @@ body {
 }
 
 #input {
+  width: 90%;
   background: black;
   border: none;
   color: #00ff00;
   outline: none;
-  width: 90%;
   font-family: monospace;
   caret-color: #00ff00;
   animation: blink-caret 1s step-end infinite;
@@ -36,13 +36,13 @@ body {
   position: fixed;
   bottom: 0;
   width: 100%;
-  font-weight: bold;
   font-size: 14px;
+  font-weight: bold;
   background: #002200;
   padding: 3px 10px;
-  color: #00ff00;
   display: flex;
   align-items: center;
+  color: #00ff00;
 }
 
 #bar {
