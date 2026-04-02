@@ -3,35 +3,30 @@ const input = document.getElementById("input");
 const traceText = document.getElementById("trace");
 const progress = document.getElementById("progress");
 
-let level = Number(localStorage.getItem("level")) || 1;
 let trace = 0;
-let currentPassword = "";
 let hacking = false;
 let timer;
 let panicInterval;
-let eliteMode = false;
-let currentMissionIndex = 0;
+let enemyGuessing = false;
+let enemyGuessIndex = 0;
+let enemyCurrentGuess = "";
+let playerPassword = "";
+let breachInProgress = false;
 
-// Missions with targets and passwords for each level
-const missions = [
-  { target: "SERVER-ALPHA", passwords: ["ACCESS", "LOGIN", "ADMIN"] },
-  { target: "NODE-BETA", passwords: ["X9P3L", "Z4K8M", "Q7R2N"] },
-  { target: "CORE-GAMMA", passwords: ["ELITE", "CYRITO", "HACK3R"] },
-];
+const passwordOptions = ["CYRITO", "HACKER", "FIREWALL", "ADMIN", "SECURE"];
 
-// Fake code puzzles for elite mode
-const elitePuzzles = [
+const breachPuzzles = [
   {
-    prompt: "Fix the syntax to unlock:\nfunction hack() {\n  console.log('ACCESS GRANTED')\n}",
-    solution: "function hack() { console.log('ACCESS GRANTED'); }",
+    prompt: "Fix the syntax to unlock the firewall:\nconsole.log('FIREWALL BREACHED')",
+    solution: "console.log('FIREWALL BREACHED');",
   },
   {
-    prompt: "Correct the variable:\nlet password = '1234'\npassword = '5678'",
-    solution: "let password = '1234'; password = '5678';",
+    prompt: "Fix this simple code:\nlet x = 10\nlet y = 20\nconsole.log(x + y)",
+    solution: "let x = 10; let y = 20; console.log(x + y);",
   },
 ];
 
-// Typing effect for terminal text
+// Typing effect
 function type(text, speed = 20) {
   return new Promise(resolve => {
     let i = 0;
@@ -52,34 +47,74 @@ function type(text, speed = 20) {
   });
 }
 
-// Scroll terminal to bottom
 function scroll() {
   terminal.scrollTop = terminal.scrollHeight;
 }
 
-// Update trace bar & text
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+// Trace bar
 function updateTrace(amount) {
   trace += amount;
   if (trace > 100) trace = 100;
+  if (trace < 0) trace = 0;
 
   traceText.innerText = trace + "%";
   progress.style.width = trace + "%";
 
-  if (trace >= 100) {
-    panic("!!! TRACE COMPLETE — ACCESS DENIED !!!");
-    input.disabled = true;
-    clearInterval(timer);
-    clearInterval(panicInterval);
+  if (trace >= 100 && !enemyGuessing) {
+    startEnemyGuessing();
   }
 }
 
-// Start trace timer (pressure)
-function startTimer() {
-  timer = setInterval(() => {
-    updateTrace(2);
-  }, 2000);
+// Enemy guesses player password
+async function startEnemyGuessing() {
+  enemyGuessing = true;
+  hacking = false;
+  clearInterval(timer);
+  clearInterval(panicInterval);
+  await type("\n!!! TRACE COMPLETE — ENEMY HACKER STARTS GUESSING YOUR PASSWORD !!!\n");
 
-  // Start random trace spikes (panic mode)
+  enemyGuessIndex = 0;
+  enemyCurrentGuess = "";
+
+  while (enemyGuessIndex < playerPassword.length) {
+    const guessChar = playerPassword[enemyGuessIndex];
+    enemyCurrentGuess += guessChar;
+
+    const hint = getHintEnemy(enemyCurrentGuess);
+    await type(`Enemy guess: ${enemyCurrentGuess}  Hint: ${hint}`);
+
+    enemyGuessIndex++;
+
+    if (enemyCurrentGuess === playerPassword) {
+      await type("\n!!! ENEMY HACKER SUCCESS — YOUR PASSWORD COMPROMISED !!!");
+      await type("GAME OVER — RELOAD TO TRY AGAIN");
+      input.disabled = true;
+      return;
+    }
+
+    await sleep(1500);
+  }
+}
+
+// Hint system for enemy
+function getHintEnemy(guess) {
+  let result = "";
+  for (let i = 0; i < guess.length; i++) {
+    if (guess[i] === playerPassword[i]) result += "✔ ";
+    else if (playerPassword.includes(guess[i])) result += "~ ";
+    else result += "✖ ";
+  }
+  return result;
+}
+
+// Trace timer
+function startTimer() {
+  timer = setInterval(() => updateTrace(2), 2000);
+
   panicInterval = setInterval(() => {
     if (!hacking) return;
     const spike = Math.random() < 0.3 ? Math.floor(Math.random() * 10) : 0;
@@ -92,64 +127,32 @@ function startTimer() {
   }, 7000);
 }
 
-// Choose password from current mission
-function setPassword() {
-  const mission = missions[currentMissionIndex];
-  currentPassword =
-    mission.passwords[Math.floor(Math.random() * mission.passwords.length)];
-}
-
-// Provide hints (Wordle-style)
-function getHint(guess) {
-  let result = "";
-  for (let i = 0; i < currentPassword.length; i++) {
-    if (guess[i] === currentPassword[i]) result += "✔ ";
-    else if (currentPassword.includes(guess[i])) result += "~ ";
-    else result += "✖ ";
+// Select player password at start
+async function choosePlayerPassword() {
+  await type("Select your password to protect your system:");
+  for (let i = 0; i < passwordOptions.length; i++) {
+    await type(`${i + 1}: ${passwordOptions[i]}`);
   }
-  return result;
-}
+  await type("Type the number of your choice:");
 
-// Handle elite mode fake coding puzzle
-async function elitePuzzle() {
-  eliteMode = true;
-  clearInterval(timer);
-  clearInterval(panicInterval);
-
-  const puzzle = elitePuzzles[Math.floor(Math.random() * elitePuzzles.length)];
-  await type("ELITE HACKER MODE ACTIVATED");
-  await type("Solve this code puzzle to proceed:");
-  await type(puzzle.prompt);
-
-  while (true) {
-    const answer = await promptUserInput();
-    if (answer.trim() === puzzle.solution) {
-      await type("PUZZLE SOLVED — ACCESS GRANTED ✅");
-      eliteMode = false;
-      hacking = false;
-      trace = 0;
-      updateTrace(0);
-      currentMissionIndex++;
-      if (currentMissionIndex >= missions.length) {
-        await type("ALL MISSIONS COMPLETE. YOU WIN!");
-        input.disabled = true;
-      } else {
-        await type("Next mission: " + missions[currentMissionIndex].target);
-      }
+  while (!playerPassword) {
+    const choice = await promptUserInput();
+    const num = Number(choice);
+    if (num >= 1 && num <= passwordOptions.length) {
+      playerPassword = passwordOptions[num - 1];
+      await type(`Password set to: ${playerPassword}`);
       break;
     } else {
-      await type("Incorrect solution. Try again.");
-      updateTrace(10);
+      await type("Invalid choice. Try again:");
     }
   }
 }
 
-// Helper for awaiting user input in elite mode puzzles
 function promptUserInput() {
   return new Promise(resolve => {
     function onEnter(e) {
       if (e.key === "Enter") {
-        const val = input.value;
+        const val = input.value.trim();
         input.value = "";
         terminal.innerHTML += "> " + val + "<br>";
         input.removeEventListener("keydown", onEnter);
@@ -160,76 +163,87 @@ function promptUserInput() {
   });
 }
 
-// Command handler with all gameplay logic
+// Handle commands
 async function handleCommand(cmd) {
-  if (eliteMode) {
-    // While in elite mode, input is handled by elitePuzzle()
+  if (enemyGuessing) {
+    if (cmd === "FIREWALL") {
+      await startFirewallMiniGame();
+    } else {
+      await type("Enemy is guessing your password! Type 'FIREWALL' to stop them temporarily.");
+    }
     return;
   }
 
-  if (cmd === "HELP") {
-    await type("Commands: HELP, SCAN, BREACH");
-  } 
-  else if (cmd === "SCAN") {
-    await type("Scanning target...");
-    await type("Open ports found");
-    await type("Vulnerability detected");
-  } 
-  else if (cmd === "BREACH") {
-    hacking = true;
-    setPassword();
-    await type("Initiating breach on " + missions[currentMissionIndex].target + "...");
-    await type("Enter password (" + currentPassword.length + " chars)");
-    startTimer();
-  } 
-  else if (hacking) {
-    if (cmd === currentPassword) {
-      await type("ACCESS GRANTED ✅");
-      hacking = false;
-      clearInterval(timer);
-      clearInterval(panicInterval);
-      trace = 0;
-      updateTrace(0);
+  if (breachInProgress) {
+    await handleBreachInput(cmd);
+    return;
+  }
 
-      // Advance mission or go to elite puzzle
-      currentMissionIndex++;
-      if (currentMissionIndex < missions.length - 1) {
-        await type("Mission complete. Next target: " + missions[currentMissionIndex].target);
-      } else {
-        await elitePuzzle();
-      }
-    } else {
-      await type("ACCESS DENIED ❌");
-      await type(getHint(cmd));
-      updateTrace(15);
-    }
-  } 
-  else {
-    await type("Unknown command");
+  switch (cmd) {
+    case "HELP":
+      await type("Commands: HELP, SCAN, FIREWALL");
+      break;
+    case "SCAN":
+      await type("Scanning target...");
+      await type("Open ports found");
+      await type("Vulnerability detected");
+      updateTrace(5);
+      break;
+    case "FIREWALL":
+      await startFirewallMiniGame();
+      break;
+    default:
+      await type("Unknown command");
   }
   scroll();
 }
 
-// Listen for user input
-input.addEventListener("keydown", async (e) => {
-  if (e.key === "Enter") {
-    const cmd = input.value.trim().toUpperCase();
-    if (!cmd) return; // ignore empty
-    terminal.innerHTML += "> " + cmd + "<br>";
-    input.value = "";
-    await handleCommand(cmd);
-  }
-});
+// Firewall mini-game (easy)
+async function startFirewallMiniGame() {
+  breachInProgress = true;
+  hacking = true;
+  clearInterval(timer);
+  clearInterval(panicInterval);
 
-// Boot sequence at start with typing effect
+  const puzzle = breachPuzzles[Math.floor(Math.random() * breachPuzzles.length)];
+  await type("FIREWALL ENGAGED — Solve the puzzle to delete enemy memory!");
+  await type(puzzle.prompt);
+  await type("Type the corrected code:");
+}
+
+// Handle firewall puzzle input
+async function handleBreachInput(inputText) {
+  const puzzle = breachPuzzles.find(p => inputText.trim() === p.solution);
+  if (puzzle) {
+    await type("Memory deleted — Trace reset. Enemy stopped!");
+    trace = 0;
+    updateTrace(0);
+    breachInProgress = false;
+    hacking = false;
+    enemyGuessing = false;
+    startTimer();
+  } else {
+    await type("Incorrect code. Try again!");
+    updateTrace(10);
+  }
+}
+
+// Boot sequence
 async function boot() {
   await type("Booting CYRITO.exe...");
   await type("[OK] Core modules loaded");
   await type("[OK] Trace system active");
-  await type("Type 'HELP' to begin");
-  await type("Mission: " + missions[currentMissionIndex].target);
-  scroll();
-  input.focus();
+  await choosePlayerPassword();
+  await type("Type 'HELP' to begin. Warning: Enemy hacker may trace you!");
+  startTimer();
 }
+
+input.addEventListener("keydown", async e => {
+  if (e.key === "Enter") {
+    const cmd = input.value.trim();
+    if (!cmd) return;
+    await handleCommand(cmd.toUpperCase());
+  }
+});
 
 boot();
