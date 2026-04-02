@@ -1,6 +1,6 @@
 # 🖥️ CYRITO.exe
 
-> Experimental breach software. Use at your own risk.
+> You are not supposed to be here...
 
 CYRITO.exe is a browser-based hacker simulation game where you crack passwords, bypass systems, and avoid being traced.
 
