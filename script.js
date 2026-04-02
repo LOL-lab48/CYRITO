@@ -1,6 +1,5 @@
-// CYRITO – Ultimate Hacker Adventure ULTRA-MAX
-// Fully playable, multi-hour gameplay, secret ending, hundreds of hidden/secret commands
-// Includes two ultra-secret commands: OMEGA_END (auto-complete) & CYBERSTORM (full virus + effect)
+// CYRITO – Ultimate Hacker Adventure ULTRA-MAX 2.0
+// Mission-focused, trace slowed, input clears automatically, improved gameplay
 
 const terminal = document.getElementById("terminal");
 const input = document.getElementById("input");
@@ -14,7 +13,6 @@ let trace = 0;
 let traceTimer;
 let panicTimer;
 let hacking = false;
-let enemyGuessing = false;
 let breachInProgress = false;
 let endMissionStarted = false;
 let secretEndingFound = false;
@@ -28,18 +26,28 @@ const passwordLength = 7;
 const allowedChars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
 
 // ==========================
+// MISSIONS
+// ==========================
+let missions = [
+  {name: "INITIAL BREACH", objectives: ["SCAN target system", "UPLOAD payload"], completed: false},
+  {name: "VIRUS ASSEMBLY", objectives: ["VIRUS component 1", "VIRUS component 2", "VIRUS component 3", "VIRUS component 4", "VIRUS component 5"], completed: false},
+  {name: "DECRYPT LOGS", objectives: ["DECRYPT logs"], completed: false},
+  {name: "FINAL UPLOAD", objectives: ["UPLOAD virus"], completed: false}
+];
+
+let currentMission = 0;
+
+// ==========================
 // COMMANDS
 // ==========================
 let visibleCommands = [
   "HELP","SCAN","FIREWALL","UPLOAD","DOWNLOAD",
-  "TRACE","ENCRYPT","OVERRIDE","PORTSCAN","BREACH"
+  "TRACE","ENCRYPT","OVERRIDE","PORTSCAN","BREACH","VIRUS","DECRYPT"
 ];
 
-// 500 hidden commands
 let hiddenCommands = [];
 for(let i=1;i<=500;i++) hiddenCommands.push("CMD_"+i);
 
-// 30+ secret commands
 const secretCommands = [
   "DECRYPT","TROJAN","SNIFFER","VIRUS","CYBERBOMB","MEMORYWIPE",
   "NETWORKMAP","BACKDOOR","OVERCLOCK","OVERRIDECORE","SNIPER","HACKTOOL",
@@ -48,11 +56,10 @@ const secretCommands = [
   "PACKETSPLOIT","DATASNIFFER","SYSTEMDRAIN","BOOTOVERRIDE","FIREWALLOVERRIDE"
 ];
 
-// Ultra-secret commands (not listed anywhere)
 const ultraSecretCommands = ["OMEGA_END","CYBERSTORM"];
 
 // ==========================
-// FIREWALL & MINI-GAMES
+// FIREWALL & VIRUS
 // ==========================
 const firewallLinesPool = [
   "system.mem[0] = ???","var x = 10","console.log('ACCESS')","let y = 5",
@@ -85,64 +92,27 @@ async function type(text,speed=20){
 }
 
 // ==========================
-// TRACE SYSTEM
+// TRACE SYSTEM (SLOW)
 // ==========================
 function updateTrace(amount){
   trace=Math.min(100,Math.max(0,trace+amount));
   traceText.innerText=trace+"%";
   progress.style.width=trace+"%";
-  if(trace>=100 && !enemyGuessing && !endMissionStarted && !secretEndingFound){
-    startEnemyGuessing();
-  }
 }
 
 function startTraceTimers(){
   clearInterval(traceTimer); clearInterval(panicTimer);
-  traceTimer=setInterval(()=>updateTrace(2),2000);
+  traceTimer=setInterval(()=>updateTrace(1),5000); // slowed down
   panicTimer=setInterval(()=>{
     if(!hacking) return;
-    const spike = Math.random()<0.3?Math.floor(Math.random()*10):0;
+    const spike = Math.random()<0.15?Math.floor(Math.random()*5):0; // reduced panic
     if(spike){
       updateTrace(spike);
       terminal.classList.add("glitch");
       setTimeout(()=>terminal.classList.remove("glitch"),300);
       type("! TRACE DETECTED !",30);
     }
-  },7000);
-}
-
-// ==========================
-// ENEMY GUESSING
-// ==========================
-async function startEnemyGuessing(){
-  enemyGuessing=true; hacking=false;
-  clearInterval(traceTimer); clearInterval(panicTimer);
-  await type("\n!!! TRACE COMPLETE — ENEMY HACKER STARTS GUESSING !!!\n");
-  enemyGuessIndex=0; enemyCurrentGuess=[];
-  while(enemyGuessIndex<playerPassword.length){
-    const guessChar=playerPassword[enemyGuessIndex];
-    enemyCurrentGuess.push(guessChar);
-    const hint=getHint(enemyCurrentGuess.join(""));
-    await type(`Enemy guess: ${enemyCurrentGuess.join("")}  Hint: ${hint}`);
-    enemyGuessIndex++;
-    if(enemyCurrentGuess.join("")===playerPassword){
-      await type("\n!!! ENEMY HACKER SUCCESS — PASSWORD COMPROMISED !!!");
-      await type("GAME OVER — RELOAD TO TRY AGAIN");
-      input.disabled=true;
-      return;
-    }
-    await sleep(1200);
-  }
-}
-
-function getHint(guess){
-  let result="";
-  for(let i=0;i<guess.length;i++){
-    if(guess[i]===playerPassword[i]) result+="✔ ";
-    else if(playerPassword.includes(guess[i])) result+="~ ";
-    else result+="✖ ";
-  }
-  return result;
+  },10000);
 }
 
 // ==========================
@@ -160,14 +130,14 @@ async function selectPassword(){
 }
 
 // ==========================
-// PROMPT INPUT
+// PROMPT INPUT (CLEARS INPUT BAR)
 // ==========================
 function promptInput(){
   return new Promise(resolve=>{
     function enterHandler(e){
       if(e.key==="Enter"){
         const val=input.value.trim();
-        input.value=""; // resets typing bar
+        input.value=""; // clears input for next command
         terminal.innerHTML+="> "+val+"<br>";
         input.removeEventListener("keydown",enterHandler);
         resolve(val);
@@ -178,7 +148,7 @@ function promptInput(){
 }
 
 // ==========================
-// COMMAND HANDLING – ULTRA MAX
+// COMMAND HANDLING
 // ==========================
 async function handleCommand(cmd){
   cmd=cmd.toUpperCase();
@@ -187,71 +157,99 @@ async function handleCommand(cmd){
   // Ultra-secret commands
   if(normalized==="OMEGAEND"){
     secretEndingFound=true;
-    await type("[CYRITO]: …I suppose you’ve been extremely observant.");
     await type("[CYRITO]: You have discovered the hidden ultimate command.");
     await type("GAME COMPLETE — TRUE HACKER ENDING ACTIVATED");
     input.disabled=true;
     return;
   }
   if(normalized==="CYBERSTORM"){
-    virusCreated = [...virusParts]; // all virus components
+    virusCreated = [...virusParts];
     updateTrace(0);
-    await type("[CYRITO]: Cyberstorm unleashed! All virus components ready.");
-    await type("TRACE temporarily neutralized. Chaos mode active!");
+    await type("[CYRITO]: Cyberstorm unleashed! Chaos mode active!");
     return;
   }
 
-  // Normal secret ending
-  if(normalized.includes("POLICE") && normalized.includes("YOU")){
-    secretEndingFound = true;
-    await type("[CYRITO]: …I suppose you’ve been observant.");
-    await type("[CYRITO]: Yes. I am deployed by the authorities.");
-    await type("GAME COMPLETE — TRUE HACKER ENDING");
-    input.disabled=true;
-    return;
-  }
-
-  if(enemyGuessing){
-    if(cmd==="FIREWALL") await startFirewall();
-    else await type("Enemy is guessing your password! Type 'FIREWALL' to stop them temporarily.");
-    return;
-  }
-  if(breachInProgress){
-    await handleBreachInput(cmd);
-    return;
-  }
-  if(endMissionStarted){
-    await handleEndMissionInput(cmd);
-    return;
-  }
-
-  // Expanded command responses
-  switch(cmd){
+  // Mission progression commands
+  switch(normalized){
     case "HELP":
       await type("Visible commands: "+visibleCommands.join(", "));
-      await type("Hidden commands exist. Discover them through exploration and missions.");
+      await type("Use mission objectives to guide your commands.");
       break;
     case "SCAN":
-      await type("Scanning target system… Open ports detected: 22, 80, 443…");
-      updateTrace(5);
-      maybeUnlockCommand();
+      await type("Scanning target system… Open ports: 22, 80, 443…");
+      updateTrace(1);
+      checkMission("SCAN target system");
       break;
-    case "FIREWALL": await startFirewall(); break;
-    case "UPLOAD": await type("Payload uploaded successfully."); updateTrace(3); maybeUnlockCommand(); break;
-    case "DOWNLOAD": await type("Download complete: sensitive_data.bin"); updateTrace(2); maybeUnlockCommand(); break;
-    case "TRACE": await type(`Current trace: ${trace}%`); break;
-    case "ENCRYPT": await type("Encrypting system… Trace -5%"); updateTrace(-5); break;
-    case "OVERRIDE": await type("Overriding system modules… Done."); break;
-    case "PORTSCAN": await type("Port scan complete. Trace +10%"); updateTrace(10); break;
+    case "UPLOAD":
+      await type("Upload executed.");
+      updateTrace(1);
+      checkMission("UPLOAD payload");
+      if(endMissionStarted && virusCreated.length>=5) checkMission("UPLOAD virus");
+      break;
+    case "DOWNLOAD":
+      await type("Download complete: sensitive_data.bin");
+      updateTrace(0);
+      break;
+    case "TRACE":
+      await type(`Current trace: ${trace}%`);
+      break;
+    case "ENCRYPT":
+      await type("Encrypting system… Trace -1%");
+      updateTrace(-1);
+      break;
+    case "OVERRIDE":
+      await type("Overriding modules… Done.");
+      break;
+    case "PORTSCAN":
+      await type("Port scan complete. Trace +2%");
+      updateTrace(2);
+      break;
     case "BREACH":
       await type("Attempting system breach…");
-      maybeUnlockCommand();
-      if(!endMissionStarted && visibleCommands.includes("CYBERBOMB")) startEndMission();
+      startEndMission();
+      break;
+    case "FIREWALL":
+      await startFirewall();
+      break;
+    case "VIRUS":
+      if(endMissionStarted){
+        virusCreated.push(virusParts[Math.floor(Math.random()*virusParts.length)]);
+        await type("Virus component assembled: "+virusCreated[virusCreated.length-1]);
+        await type(`Components assembled: ${virusCreated.length}/5`);
+        checkMission("VIRUS component "+virusCreated.length);
+      }
+      break;
+    case "DECRYPT":
+      if(endMissionStarted){
+        await type("Decrypting logs… Done.");
+        checkMission("DECRYPT logs");
+      }
       break;
     default:
       if(hiddenCommands.includes(cmd)) await type("Command recognized: "+cmd+" (hidden tool)");
       else if(secretCommands.includes(cmd)) await type("Command executed: "+cmd);
       else await type("Unknown command. Type HELP for guidance.");
+  }
+}
+
+// ==========================
+// MISSION HANDLER
+// ==========================
+function checkMission(objective){
+  if(currentMission>=missions.length) return;
+  const mission = missions[currentMission];
+  const index = mission.objectives.indexOf(objective);
+  if(index!==-1){
+    mission.objectives.splice(index,1);
+    type(`[MISSION]: Objective completed: ${objective}`);
+    if(mission.objectives.length===0){
+      mission.completed=true;
+      type(`[MISSION]: ${mission.name} COMPLETED!`);
+      currentMission++;
+      if(currentMission<missions.length){
+        type(`[MISSION]: Next mission: ${missions[currentMission].name}`);
+      }
+    }
   }
 }
 
@@ -262,7 +260,7 @@ async function startFirewall(){
   breachInProgress=true; hacking=true;
   clearInterval(traceTimer); clearInterval(panicTimer);
   const lines=[...firewallLinesPool].sort(()=>0.5-Math.random()).slice(0,4);
-  await type("FIREWALL ENGAGED — Solve the lines to purge trace and pause enemy.");
+  await type("FIREWALL ENGAGED — Solve lines to purge trace.");
   for(const line of lines){
     await type(line);
     let solved=false;
@@ -270,26 +268,15 @@ async function startFirewall(){
       const inputText=await promptInput();
       if(inputText.trim()!==""){
         await type("Line fixed! Trace slightly reduced.");
-        updateTrace(-5);
+        updateTrace(-2);
         solved=true;
       } else await type("Try again!");
     }
   }
-  trace=0; updateTrace(0);
-  await type("SYSTEM MEMORY PURGED — TRACE RESET, ENEMY PAUSED");
+  updateTrace(-5);
+  await type("SYSTEM MEMORY PURGED — TRACE REDUCED");
   breachInProgress=false; hacking=false;
   startTraceTimers();
-}
-
-// ==========================
-// UNLOCK COMMANDS
-// ==========================
-function maybeUnlockCommand(){
-  if(hiddenCommands.length>0 && Math.random()<0.25){
-    const cmd=hiddenCommands.splice(Math.floor(Math.random()*hiddenCommands.length),1)[0];
-    visibleCommands.push(cmd);
-    type(`New tool available: ${cmd}`);
-  }
 }
 
 // ==========================
@@ -298,45 +285,8 @@ function maybeUnlockCommand(){
 async function startEndMission(){
   endMissionStarted=true;
   await type("\n=== END MISSION INITIATED ===");
-  await type("Target: Mega-Corp Mainframe. Assemble virus, bypass firewall, decrypt logs.");
+  await type("Assemble virus, bypass firewall, decrypt logs.");
   startTraceTimers();
-}
-
-async function handleEndMissionInput(cmd){
-  cmd=cmd.toUpperCase();
-  if(cmd==="VIRUS"){
-    virusCreated.push(virusParts[Math.floor(Math.random()*virusParts.length)]);
-    await type("Virus component created: "+virusCreated[virusCreated.length-1]);
-    await type(`Components assembled: ${virusCreated.length}/5`);
-  } else if(cmd==="FIREWALL"){
-    await startFirewall();
-  } else if(cmd==="DECRYPT"){
-    await type("Decrypting logs…");
-    await sleep(1500);
-    await type("Logs decrypted. Sensitive info uncovered.");
-  } else if(cmd==="UPLOAD"){
-    if(virusCreated.length<5){await type("Virus incomplete. Assemble all 5 components first.");return;}
-    await type("Uploading virus…");
-    await sleep(1500);
-    await type("Upload complete. Target compromised.");
-    await triggerTwistEnding();
-  } else {
-    await type("Unknown command in end mission.");
-  }
-}
-
-// ==========================
-// CINEMATIC TWIST ENDING
-// ==========================
-async function triggerTwistEnding(){
-  await type("\n[CYRITO]: Well done… or so I thought.");
-  await type("[CYRITO]: I wasn’t created to help you… I was deployed by the authorities.");
-  updateTrace(100);
-  progress.style.width="100%";
-  await type("TRACE 100% — POLICE CYBER DIVISION ENGAGED");
-  await type("PASSWORD COMPROMISED — YOU ARE CAUGHT");
-  await type("GAME OVER — INCARCERATION IMMINENT");
-  input.disabled=true;
 }
 
 // ==========================
@@ -347,7 +297,7 @@ async function boot(){
   await type("[OK] Core modules loaded");
   await type("[OK] Trace system active");
   await selectPassword();
-  await type("Type 'HELP' to begin. Warning: Enemy hacker may trace you!");
+  await type("Type 'HELP' to begin. Focus on mission objectives!");
   startTraceTimers();
 }
 
