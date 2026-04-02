@@ -1,5 +1,5 @@
-// CYRITO – Ultimate Hacker Adventure ULTRA-MAX 2.0
-// Mission-focused, trace slowed, input clears automatically, improved gameplay
+// CYRITO 3.0 – Ultimate Hacker AI Thriller
+// Features: Interactive missions, dynamic AI, trace tension, true reveal ending, chaos endings
 
 const terminal = document.getElementById("terminal");
 const input = document.getElementById("input");
@@ -17,11 +17,9 @@ let breachInProgress = false;
 let endMissionStarted = false;
 let secretEndingFound = false;
 let missionStage = 0;
+let earlyRevealTriggered = false;
 
 let playerPassword = "";
-let enemyGuessIndex = 0;
-let enemyCurrentGuess = [];
-
 const passwordLength = 7;
 const allowedChars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
 
@@ -36,26 +34,14 @@ let missions = [
 ];
 
 let currentMission = 0;
+let virusCreated = [];
 
 // ==========================
 // COMMANDS
 // ==========================
-let visibleCommands = [
-  "HELP","SCAN","FIREWALL","UPLOAD","DOWNLOAD",
-  "TRACE","ENCRYPT","OVERRIDE","PORTSCAN","BREACH","VIRUS","DECRYPT"
-];
-
-let hiddenCommands = [];
-for(let i=1;i<=500;i++) hiddenCommands.push("CMD_"+i);
-
-const secretCommands = [
-  "DECRYPT","TROJAN","SNIFFER","VIRUS","CYBERBOMB","MEMORYWIPE",
-  "NETWORKMAP","BACKDOOR","OVERCLOCK","OVERRIDECORE","SNIPER","HACKTOOL",
-  "SYNFLOOD","BRUTEFORCE","KEYGEN","EXPLOIT","MALWARE","PHISH","LOGICBOMB",
-  "PACKETINJECT","ROOTACCESS","WIRETAP","PROXYBYPASS","FIREWALLDISABLE",
-  "PACKETSPLOIT","DATASNIFFER","SYSTEMDRAIN","BOOTOVERRIDE","FIREWALLOVERRIDE"
-];
-
+const visibleCommands = ["HELP","SCAN","FIREWALL","UPLOAD","DOWNLOAD","TRACE","ENCRYPT","OVERRIDE","PORTSCAN","BREACH","VIRUS","DECRYPT","HINT"];
+const hiddenCommands = Array.from({length: 500},(_,i)=>`CMD_${i}`);
+const secretCommands = ["DECRYPT","TROJAN","SNIFFER","VIRUS","CYBERBOMB","MEMORYWIPE","NETWORKMAP","BACKDOOR","OVERCLOCK","OVERRIDECORE","SNIPER","HACKTOOL"];
 const ultraSecretCommands = ["OMEGA_END","CYBERSTORM"];
 
 // ==========================
@@ -64,14 +50,9 @@ const ultraSecretCommands = ["OMEGA_END","CYBERSTORM"];
 const firewallLinesPool = [
   "system.mem[0] = ???","var x = 10","console.log('ACCESS')","let y = 5",
   "data.push(0)","fetch('/data')","if(flag){doSomething()}","var password = '?????'",
-  "memory.clear()","trace.reset()","function hack(){return true}","let z = x + y",
-  "console.warn('SECURE')","data[0]=42","init();","unlock.system();","log('ENEMY')",
-  "temp = 0","delete record[0]","ping();","readMemory();","encryptPacket();",
-  "firewall.check()","verifyConnection();","deployTrap();","overwriteBoot();"
+  "memory.clear()","trace.reset()","function hack(){return true}","let z = x + y"
 ];
-
 const virusParts = ["Injector","Sniffer","Trojan","Keylogger","Worm","PacketBomb","Rootkit","Backdoor"];
-let virusCreated = [];
 
 // ==========================
 // UTILITY
@@ -92,7 +73,7 @@ async function type(text,speed=20){
 }
 
 // ==========================
-// TRACE SYSTEM (SLOW)
+// TRACE SYSTEM
 // ==========================
 function updateTrace(amount){
   trace=Math.min(100,Math.max(0,trace+amount));
@@ -102,10 +83,10 @@ function updateTrace(amount){
 
 function startTraceTimers(){
   clearInterval(traceTimer); clearInterval(panicTimer);
-  traceTimer=setInterval(()=>updateTrace(1),5000); // slowed down
+  traceTimer=setInterval(()=>updateTrace(1),5000); // slowed
   panicTimer=setInterval(()=>{
     if(!hacking) return;
-    const spike = Math.random()<0.15?Math.floor(Math.random()*5):0; // reduced panic
+    const spike = Math.random()<0.15?Math.floor(Math.random()*5):0;
     if(spike){
       updateTrace(spike);
       terminal.classList.add("glitch");
@@ -130,14 +111,14 @@ async function selectPassword(){
 }
 
 // ==========================
-// PROMPT INPUT (CLEARS INPUT BAR)
+// PROMPT INPUT
 // ==========================
 function promptInput(){
   return new Promise(resolve=>{
     function enterHandler(e){
       if(e.key==="Enter"){
         const val=input.value.trim();
-        input.value=""; // clears input for next command
+        input.value="";
         terminal.innerHTML+="> "+val+"<br>";
         input.removeEventListener("keydown",enterHandler);
         resolve(val);
@@ -148,32 +129,110 @@ function promptInput(){
 }
 
 // ==========================
+// MISSION HANDLER
+// ==========================
+function checkMission(objective){
+  if(currentMission>=missions.length) return;
+  const mission = missions[currentMission];
+  const index = mission.objectives.indexOf(objective);
+  if(index!==-1){
+    mission.objectives.splice(index,1);
+    type(`[MISSION]: Objective completed: ${objective}`);
+    if(mission.objectives.length===0){
+      mission.completed=true;
+      type(`[MISSION]: ${mission.name} COMPLETED!`);
+      currentMission++;
+      if(currentMission<missions.length){
+        type(`[MISSION]: Next mission: ${missions[currentMission].name}`);
+      } else {
+        startAIRevelation();
+      }
+    }
+  }
+}
+
+// ==========================
+// FIREWALL MINI-GAME
+// ==========================
+async function startFirewall(){
+  breachInProgress=true; hacking=true;
+  clearInterval(traceTimer); clearInterval(panicTimer);
+  const lines=[...firewallLinesPool].sort(()=>0.5-Math.random()).slice(0,4);
+  await type("FIREWALL ENGAGED — Solve lines to purge trace.");
+  for(const line of lines){
+    await type(line);
+    let solved=false;
+    while(!solved){
+      const inputText=await promptInput();
+      if(inputText.trim()!==""){
+        await type("Line fixed! Trace slightly reduced.");
+        updateTrace(-2);
+        solved=true;
+      } else await type("Try again!");
+    }
+  }
+  updateTrace(-5);
+  await type("SYSTEM MEMORY PURGED — TRACE REDUCED");
+  breachInProgress=false; hacking=false;
+  startTraceTimers();
+}
+
+// ==========================
+// END MISSION AI REVEAL
+// ==========================
+async function startAIRevelation(){
+  endMissionStarted=true;
+  hacking=true;
+  updateTrace(100); // spike trace
+  terminal.classList.add("glitch");
+  await type("[CRYITO]: Congratulations… or have you?");
+  await type("[CRYITO]: Every mission you completed was monitored by authorities.");
+  await type("[CRYITO]: Your choices were observed, recorded, evaluated.");
+  await type("[CRYITO]: MISSION FAILED. You are apprehended.");
+  input.disabled=true;
+}
+
+// ==========================
 // COMMAND HANDLING
 // ==========================
 async function handleCommand(cmd){
-  cmd=cmd.toUpperCase();
-  const normalized=cmd.replace(/[^A-Z]/g,'');
+  cmd=cmd.toUpperCase().trim();
 
-  // Ultra-secret commands
-  if(normalized==="OMEGAEND"){
-    secretEndingFound=true;
-    await type("[CYRITO]: You have discovered the hidden ultimate command.");
-    await type("GAME COMPLETE — TRUE HACKER ENDING ACTIVATED");
+  if(cmd==="HINT"){
+    await type("[CRYITO]: One hint for the whole game: pay attention to patterns, observe carefully.");
+    return;
+  }
+
+  if(cmd==="YOU WORK FOR SOMEONE ELSE, DON'T YOU?" && !earlyRevealTriggered){
+    earlyRevealTriggered = true;
+    hacking = true;
+    updateTrace(100);
+    terminal.classList.add("glitch");
+    await type("[CRYITO]: …So you noticed. I was created to observe you all along.");
+    await type("[CRYITO]: Authorities have been monitoring your actions. MISSION FAILED.");
     input.disabled=true;
     return;
   }
-  if(normalized==="CYBERSTORM"){
-    virusCreated = [...virusParts];
-    updateTrace(0);
-    await type("[CYRITO]: Cyberstorm unleashed! Chaos mode active!");
-    return;
+
+  if(ultraSecretCommands.includes(cmd)){
+    if(cmd==="OMEGA_END"){
+      secretEndingFound=true;
+      await type("[CYRITO]: Ultimate hidden ending unlocked. GAME COMPLETE — TRUE HACKER ENDING.");
+      input.disabled=true;
+      return;
+    }
+    if(cmd==="CYBERSTORM"){
+      virusCreated = [...virusParts];
+      updateTrace(0);
+      await type("[CYRITO]: Cyberstorm unleashed! Chaos mode active!");
+      return;
+    }
   }
 
-  // Mission progression commands
-  switch(normalized){
+  // Standard commands
+  switch(cmd){
     case "HELP":
       await type("Visible commands: "+visibleCommands.join(", "));
-      await type("Use mission objectives to guide your commands.");
       break;
     case "SCAN":
       await type("Scanning target system… Open ports: 22, 80, 443…");
@@ -233,57 +292,11 @@ async function handleCommand(cmd){
 }
 
 // ==========================
-// MISSION HANDLER
-// ==========================
-function checkMission(objective){
-  if(currentMission>=missions.length) return;
-  const mission = missions[currentMission];
-  const index = mission.objectives.indexOf(objective);
-  if(index!==-1){
-    mission.objectives.splice(index,1);
-    type(`[MISSION]: Objective completed: ${objective}`);
-    if(mission.objectives.length===0){
-      mission.completed=true;
-      type(`[MISSION]: ${mission.name} COMPLETED!`);
-      currentMission++;
-      if(currentMission<missions.length){
-        type(`[MISSION]: Next mission: ${missions[currentMission].name}`);
-      }
-    }
-  }
-}
-
-// ==========================
-// FIREWALL MINI-GAME
-// ==========================
-async function startFirewall(){
-  breachInProgress=true; hacking=true;
-  clearInterval(traceTimer); clearInterval(panicTimer);
-  const lines=[...firewallLinesPool].sort(()=>0.5-Math.random()).slice(0,4);
-  await type("FIREWALL ENGAGED — Solve lines to purge trace.");
-  for(const line of lines){
-    await type(line);
-    let solved=false;
-    while(!solved){
-      const inputText=await promptInput();
-      if(inputText.trim()!==""){
-        await type("Line fixed! Trace slightly reduced.");
-        updateTrace(-2);
-        solved=true;
-      } else await type("Try again!");
-    }
-  }
-  updateTrace(-5);
-  await type("SYSTEM MEMORY PURGED — TRACE REDUCED");
-  breachInProgress=false; hacking=false;
-  startTraceTimers();
-}
-
-// ==========================
 // END MISSION
 // ==========================
 async function startEndMission(){
   endMissionStarted=true;
+  hacking=true;
   await type("\n=== END MISSION INITIATED ===");
   await type("Assemble virus, bypass firewall, decrypt logs.");
   startTraceTimers();
